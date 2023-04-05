@@ -1,5 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
+use std::sync::mpsc::{Sender};
+use std::sync::mpsc;
 
 struct Philosopher {
     name: String,
@@ -16,17 +18,19 @@ impl Philosopher {
         }
     }
 
-    fn eat(&self, table: &Table) {
+    fn eat(&self, table: &Table, sender: &Sender<String>) {
         let _left = table.forks[self.left].lock().unwrap();
         let _right = table.forks[self.right].lock().unwrap();
 
-        println!("{} is eating.", self.name);
+        // println!("{} is eating.", self.name);
+        sender.send(format!("{} is eating.", self.name).to_string()).unwrap();
 
         let delay = time::Duration::from_millis(1000);
 
         thread::sleep(delay);
 
-        println!("{} is done eating.", self.name);
+        // println!("{} is done eating.", self.name);
+        sender.send(format!("{} is done eating.", self.name).to_string()).unwrap();
     }
 }
 
@@ -35,6 +39,7 @@ struct Table {
 }
 
 fn main() {
+    let (tx, rx) = mpsc::channel();
     let table = Arc::new(Table {
         forks: vec![
             Mutex::new(()),
@@ -58,9 +63,10 @@ fn main() {
         .into_iter()
         .map(|p| {
             let table = table.clone();
+            let sender = tx.clone();
 
             thread::spawn(move || {
-                p.eat(&table);
+                p.eat(&table, &sender);
             })
         })
         .collect();
@@ -68,4 +74,17 @@ fn main() {
     for h in handles {
         h.join().unwrap();
     }
+
+    tx.send("Done".to_string()).unwrap();
+
+    let mut result: String = String::from("");
+ 
+    for received in rx {
+        if received == "Done" {
+            break;
+        }
+        result.push_str(&received);
+        result.push_str("\n");
+    }
+    println!("{}", result);
 }
