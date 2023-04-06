@@ -6,7 +6,7 @@ Taken from [here](https://www.hackertouch.com/dining-philosophers-problem-in-rus
 
 ```
 cargo build
-/target/debug/dining-philosophers 
+./target/debug/dining-philosophers 
 ```
 
 Get like the following.
