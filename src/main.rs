@@ -17,7 +17,12 @@ impl Philosopher {
     }
 
     fn eat(&self, table: &Table) {
+        println!("{} is picking up the left fork.", self.name);
         let _left = table.forks[self.left].lock().unwrap();
+
+        thread::sleep(time::Duration::from_millis(5));
+
+        println!("{} is picking up the right fork.", self.name);
         let _right = table.forks[self.right].lock().unwrap();
 
         println!("{} is eating.", self.name);
@@ -51,7 +56,7 @@ fn main() {
         Philosopher::new("Larry", 1, 2),
         Philosopher::new("Mark", 2, 3),
         Philosopher::new("John", 3, 4),
-        Philosopher::new("Bruce", 0, 4),
+        Philosopher::new("Bruce", 4, 0),
     ];
 
     let handles: Vec<_> = philosophers
