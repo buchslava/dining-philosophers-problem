@@ -1,5 +1,5 @@
 [package]
-name = "dining-philosophers"
+name = "cooptex-demo"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,4 +7,7 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.21.0"
+cooptex = "0.2.1"
+frunk = "0.4.1"
 image = "0.24.6"
+rand = "0.8.5"

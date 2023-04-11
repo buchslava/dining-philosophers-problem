@@ -1,90 +1,48 @@
-use std::sync::{Arc, Mutex};
-use std::{thread, time};
-use std::sync::mpsc::{Sender};
-use std::sync::mpsc;
+use cooptex::{lock, lock_in_order::Unwrap};
 
-struct Philosopher {
-    name: String,
-    left: usize,
-    right: usize,
-}
+use frunk::{hlist, hlist_pat};
 
-impl Philosopher {
-    fn new(name: &str, left: usize, right: usize) -> Philosopher {
-        Philosopher {
-            name: name.to_string(),
-            left: left,
-            right: right,
-        }
-    }
-
-    fn eat(&self, table: &Table, sender: &Sender<String>) {
-        let _left = table.forks[self.left].lock().unwrap();
-        let _right = table.forks[self.right].lock().unwrap();
-
-        // println!("{} is eating.", self.name);
-        sender.send(format!("{} is eating.", self.name).to_string()).unwrap();
-
-        let delay = time::Duration::from_millis(1000);
-
-        thread::sleep(delay);
-
-        // println!("{} is done eating.", self.name);
-        sender.send(format!("{} is done eating.", self.name).to_string()).unwrap();
-    }
-}
-
-struct Table {
-    forks: Vec<Mutex<()>>,
-}
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 
 fn main() {
-    let (tx, rx) = mpsc::channel();
-    let table = Arc::new(Table {
-        forks: vec![
-            Mutex::new(()),
-            Mutex::new(()),
-            Mutex::new(()),
-            Mutex::new(()),
-            Mutex::new(()),
-        ],
-    });                                         
+    let num_accounts = 10;
+    let num_threads = 100;
 
+    let accounts = Arc::new(
+        (0..num_accounts)
+            .map(|_| Mutex::new(1000))
+            .collect::<Vec<_>>(),
+    );
 
-    let philosophers = vec![
-        Philosopher::new("Donald", 0, 1),
-        Philosopher::new("Larry", 1, 2),
-        Philosopher::new("Mark", 2, 3),
-        Philosopher::new("John", 3, 4),
-        Philosopher::new("Bruce", 0, 4),
-    ];
+    let started = Arc::new(AtomicUsize::new(0));
 
-    let handles: Vec<_> = philosophers
-        .into_iter()
-        .map(|p| {
-            let table = table.clone();
-            let sender = tx.clone();
+    (0..num_threads)
+        .map(|_| {
+            let accounts = accounts.clone();
+            let started = started.clone();
+            std::thread::spawn(move || {
+                started.fetch_add(1, Ordering::SeqCst);
+                while started.load(Ordering::SeqCst) < num_threads {
+                    std::thread::yield_now();
+                }
 
-            thread::spawn(move || {
-                p.eat(&table, &sender);
+                use rand::prelude::SliceRandom;
+                let mut accounts = accounts.choose_multiple(&mut rand::thread_rng(), 2);
+                let from = accounts.next().unwrap();
+                let to = accounts.next().unwrap();
+
+                let hlist_pat![mut from, mut to] = lock(hlist![from, to]).unwrap();
+                eprintln!("{:?} doing transfer", std::thread::current().id());
+                *from -= 3;
+                *to += 3;
             })
         })
-        .collect();
+        .collect::<Vec<_>>()
+        .into_iter()
+        .for_each(|t| t.join().unwrap());
 
-    for h in handles {
-        h.join().unwrap();
-    }
-
-    tx.send("Done".to_string()).unwrap();
-
-    let mut result: String = String::from("");
- 
-    for received in rx {
-        if received == "Done" {
-            break;
-        }
-        result.push_str(&received);
-        result.push_str("\n");
-    }
-    println!("{}", result);
+    eprintln!("All threads complete");
 }
